@@ -52,3 +52,4 @@ public abstract class Employee {
                 employeeId, name, employeeType.name(), basicSalary);
     }
 }
+

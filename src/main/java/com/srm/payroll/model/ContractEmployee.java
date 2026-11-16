@@ -39,3 +39,4 @@ public class ContractEmployee extends Employee {
                 getEmployeeId(), getName(), getBasicSalary(), contractAllowance, contractMonths);
     }
 }
+

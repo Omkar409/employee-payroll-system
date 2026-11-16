@@ -10,3 +10,4 @@ public interface UserDAO {
     boolean existsByEmail(String email) throws DataAccessException;
     void updateLastLogin(int userId) throws DataAccessException;
 }
+

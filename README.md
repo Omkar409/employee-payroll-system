@@ -109,3 +109,4 @@ java -cp "out/production/java;out/test/java;lib/mysql-connector-j-26.10.0.jar" c
 4. **PreparedStatement Only**: 100% parameter binding; fully immune to SQL injection attacks (tested against `' OR '1'='1' --`, `admin'--`, and payload strings).
 5. **Polymorphic Payroll Processing**: Permanent and Contract employees calculate gross, deductions, and net salary polymorphically without manual type casting.
 6. **Atomic Transactions**: Batch payroll runs write all calculated results inside a single transactional block (`setAutoCommit(false)` / `executeBatch()` / `commit()` / `rollback()`).
+

@@ -16,3 +16,4 @@ public class StandardPayrollCalculator implements PayrollCalculator {
         return new PayrollResult(employee.getEmployeeId(), employee.getName(), gross, deductions, net);
     }
 }
+

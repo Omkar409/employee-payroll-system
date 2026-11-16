@@ -32,3 +32,4 @@ public class PermanentEmployee extends Employee {
                 getEmployeeId(), getName(), getBasicSalary(), bonus);
     }
 }
+

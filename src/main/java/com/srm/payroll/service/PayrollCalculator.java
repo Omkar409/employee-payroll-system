@@ -6,3 +6,4 @@ import com.srm.payroll.model.PayrollResult;
 public interface PayrollCalculator {
     PayrollResult calculate(Employee employee);
 }
+

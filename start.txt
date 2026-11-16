@@ -1,0 +1,7 @@
+java -cp "out/production/java;lib/mysql-connector-j-26.10.0.jar" com.srm.payroll.Main
+USE payroll_db;
+SHOW TABLES;
+SELECT * FROM employees;
+credential:
+	admin
+	Admin@1234

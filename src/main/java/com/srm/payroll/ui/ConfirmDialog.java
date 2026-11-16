@@ -67,3 +67,4 @@ public class ConfirmDialog extends Dialog {
         return dialog.confirmed;
     }
 }
+

@@ -63,3 +63,4 @@ CREATE TABLE IF NOT EXISTS payroll_results (
   REFERENCES employees(employee_id) ON DELETE CASCADE,
  INDEX idx_pr_run (run_id)
 ) ENGINE=InnoDB;
+

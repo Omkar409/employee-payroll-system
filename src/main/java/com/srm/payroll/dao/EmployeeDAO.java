@@ -14,3 +14,4 @@ public interface EmployeeDAO {
     boolean deleteById(int employeeId) throws DataAccessException;
     int count() throws DataAccessException;
 }
+

@@ -7,3 +7,4 @@ public interface PayrollResultDAO {
     void saveBatch(String runId, List<PayrollResult> results) throws DataAccessException;
     List<PayrollResult> findByRunId(String runId) throws DataAccessException;
 }
+

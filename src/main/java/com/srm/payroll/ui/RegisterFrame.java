@@ -228,3 +228,4 @@ public class RegisterFrame extends Frame {
         dispose();
     }
 }
+

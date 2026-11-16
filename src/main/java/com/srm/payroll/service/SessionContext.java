@@ -33,3 +33,4 @@ public final class SessionContext {
         CURRENT_USER.set(null);
     }
 }
+

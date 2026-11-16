@@ -9,3 +9,4 @@ public interface PayrollProgressListener {
     void onCancelled(int processed, int total);
     void onError(Exception cause);
 }
+

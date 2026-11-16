@@ -86,3 +86,4 @@ public final class DatabaseConnection {
         return properties;
     }
 }
+

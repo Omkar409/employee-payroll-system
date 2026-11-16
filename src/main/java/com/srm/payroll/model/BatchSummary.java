@@ -8,3 +8,4 @@ public record BatchSummary(
         double totalNet,
         long durationMillis
 ) {}
+

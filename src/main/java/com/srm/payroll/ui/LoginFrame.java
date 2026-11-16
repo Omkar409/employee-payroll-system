@@ -224,3 +224,4 @@ public class LoginFrame extends Frame {
         txtUsername.requestFocus();
     }
 }
+

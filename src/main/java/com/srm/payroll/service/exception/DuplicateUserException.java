@@ -9,3 +9,4 @@ public class DuplicateUserException extends Exception {
         super(message, cause);
     }
 }
+

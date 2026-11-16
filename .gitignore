@@ -26,3 +26,4 @@ out/
 
 # Database credentials
 src/main/resources/db.properties
+
