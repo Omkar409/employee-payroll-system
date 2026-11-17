@@ -27,3 +27,6 @@ out/
 # Database credentials
 src/main/resources/db.properties
 
+# Local sample data and test files
+data/
+

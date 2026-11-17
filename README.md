@@ -1,10 +1,50 @@
-# Employee Payroll Management System v2 (CSE 309)
+# Employee Payroll Management System (CSE 309)
+**SRM University AP - Department of Computer Science & Engineering**
 
-Architectural Blueprint & Implementation based on Java AWT, MySQL (JDBC), Layered Architecture, and Multithreading.
+Authors: J. Neeraj Kumar, P. Surya, Omkar, Kushwanth  
+Course: CSE 309 - Advanced Java Programming (Project Based Learning)
 
 ---
 
-## 1. System Overview & Architecture
+## 1. Academic Project Implementation (`package payroll`)
+The core project implementation matches the 30-page academic report specifications and Java syllabus requirements:
+- **Language & Runtime**: Java 17+ Standard Edition (Pure Java SE, zero external dependencies).
+- **Desktop UI**: Strictly Java AWT (`java.awt.Frame`, `Panel`, `Button`, `TextField`, `TextArea`, `Choice`, `BorderLayout`, `GridLayout`, `FlowLayout`, `ActionListener`, `ItemListener`, `WindowAdapter`).
+- **Object-Oriented Design**:
+  - `Employee` (Abstract base class)
+  - `PermanentEmployee` (Subclass with HRA, standard allowance, PF, and Tax)
+  - `ContractEmployee` (Subclass with additional contract allowance)
+  - `OrganizationEmployee` & `ExecutiveEmployee` (Multilevel inheritance hierarchy demonstration)
+- **Salary Computation & Polymorphism**:
+  - `PayrollCalculator` (Interface contract)
+  - `StandardPayrollCalculator` (HRA: 20%, Allowance: 10%, PF: 12%, Professional Tax: ₹200)
+  - `PayrollResult` (Immutable calculated model)
+  - `PayrollService` (Calculation service using runtime polymorphism)
+- **Collections & Thread Safety**:
+  - `EmployeeRepository` (`HashMap<Integer, Employee>` with `synchronized` methods)
+- **Multithreading**:
+  - `PayrollTask` (Implements `Runnable` for batch payroll processing on a background thread without freezing the AWT EDT)
+- **File Persistence & Streams**:
+  - `PayrollFileService` (CSV save & load, overloaded report generation, byte stream `FileInputStream`/`FileOutputStream` file copy with explicit `finally` block)
+- **Custom Exceptions**:
+  - `PayrollException`, `ValidationException`, `DuplicateEmployeeException`, `EmployeeNotFoundException`, `FileStorageException`
+
+### How to Run Academic Project
+```powershell
+# Compile:
+javac -d out/production/java (Get-ChildItem -Recurse -Filter "*.java" src/main/java/payroll | Select-Object -ExpandProperty FullName)
+
+# Run Academic AWT Desktop GUI:
+java -cp out/production/java payroll.Main
+
+# Run Academic Automated Test Suite (TC01 - TC12 & Calculations from Report Section 9):
+javac -cp out/production/java -d out/test/java src/test/java/payroll/PayrollTestSuite.java
+java -cp "out/production/java;out/test/java" payroll.PayrollTestSuite
+```
+
+---
+
+## 2. Extended Enterprise Edition v2 (`package com.srm.payroll`)
 - **Language & Runtime**: Java 17+ (Standard Edition)
 - **GUI Framework**: Strictly Java AWT (`java.awt.*`, `java.awt.event.*`). No Swing or JavaFX.
 - **Database**: MySQL 8.0+ via JDBC (`mysql-connector-j-26.10.0`), `PreparedStatement` only.

@@ -1,7 +1,32 @@
-java -cp "out/production/java;lib/mysql-connector-j-26.10.0.jar" com.srm.payroll.Main
-USE payroll_db;
-SHOW TABLES;
-SELECT * FROM employees;
-credential:
-	admin
-	Admin@1234
+========================================================================
+EMPLOYEE PAYROLL MANAGEMENT SYSTEM - RUN GUIDE
+Course: CSE 309 Advanced Java Programming (SRM University AP)
+========================================================================
+
+1. RUN THE ACADEMIC REPORT PROJECT (Pure Java SE, AWT GUI, No external DB needed):
+   ------------------------------------------------------------------------
+   Compile:
+   javac -d out/production/java src/main/java/payroll/*.java
+
+   Run Academic AWT GUI:
+   java -cp out/production/java payroll.Main
+
+   Run Academic Test Suite (TC01 - TC12 & Calculations from Report Section 9):
+   javac -cp out/production/java -d out/test/java src/test/java/payroll/*.java
+   java -cp "out/production/java;out/test/java" payroll.PayrollTestSuite
+
+2. RUN THE ENTERPRISE v2 SYSTEM (With MySQL & Authentication):
+   ------------------------------------------------------------------------
+   Run Enterprise GUI:
+   java -cp "out/production/java;lib/mysql-connector-j-26.10.0.jar" com.srm.payroll.Main
+
+   Run Test Matrix Suite (T05 - T28 verification):
+   java -cp "out/production/java;out/test/java;lib/mysql-connector-j-26.10.0.jar" com.srm.payroll.TestMatrixSuite
+
+   Default Logins:
+   - admin / Admin@1234 (ADMIN)
+   - hr_user / HrUser@1234 (HR)
+   - omkar / Omkar@1234 (ADMIN)
+   - neeraj / Neeraj@1234 (HR)
+   - kushwanth / Kushwanth@1234 (ADMIN)
+   - surya / Surya@1234 (HR)
