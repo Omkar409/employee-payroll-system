@@ -44,7 +44,7 @@ java -cp "out/production/java;out/test/java" payroll.PayrollTestSuite
 
 ---
 
-## 2. Extended Enterprise Edition v2 (`package com.srm.payroll`)
+## 2. Extended Enterprise  (`package com.srm.payroll`)
 - **Language & Runtime**: Java 17+ (Standard Edition)
 - **GUI Framework**: Strictly Java AWT (`java.awt.*`, `java.awt.event.*`). No Swing or JavaFX.
 - **Database**: MySQL 8.0+ via JDBC (`mysql-connector-j-26.10.0`), `PreparedStatement` only.
