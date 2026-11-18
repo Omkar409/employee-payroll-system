@@ -1,15 +1,53 @@
 package payroll;
 
+import payroll.config.DatabaseConnection;
+import payroll.dao.impl.UserDAOImpl;
+import payroll.service.AuthService;
+import payroll.ui.AlertDialog;
+import payroll.ui.LoginFrame;
+
 import java.awt.EventQueue;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Main application entry point for the Employee Payroll Management System.
- * Demonstrates:
- * - Application entry point (main method)
- * - EventQueue.invokeLater() scheduling the GUI on AWT's Event Dispatch Thread (EDT)
+ * Pre-checks database connectivity and launches LoginFrame on the AWT Event Dispatch Thread (EDT).
  */
 public class Main {
+
+    private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
+
     public static void main(String[] args) {
-        EventQueue.invokeLater(() -> new PayrollFrame());
+        LOGGER.info("Starting Employee Payroll Management System...");
+
+        boolean dbConnected = false;
+        try {
+            dbConnected = DatabaseConnection.getInstance().testConnection();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Startup DB connection check failed: " + e.getMessage());
+        }
+
+        final boolean isDbAvailable = dbConnected;
+
+        EventQueue.invokeLater(() -> {
+            try {
+                UserDAOImpl userDAO = new UserDAOImpl();
+                AuthService authService = new AuthService(userDAO);
+
+                LoginFrame loginFrame = new LoginFrame(authService);
+                loginFrame.setVisible(true);
+
+                if (!isDbAvailable) {
+                    AlertDialog.show(loginFrame, "Database Connection Warning",
+                            "Could not establish initial connection to MySQL database.\n" +
+                            "Please verify MySQL service is running and db.properties has valid credentials.");
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Fatal error launching UI", e);
+                AlertDialog.show(null, "Startup Error", "Failed to start application:\n" + e.getMessage());
+                System.exit(1);
+            }
+        });
     }
 }
