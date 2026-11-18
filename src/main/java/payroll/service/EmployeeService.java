@@ -26,6 +26,12 @@ public class EmployeeService {
         return employeeDAO.insert(e, createdByUserId);
     }
 
+    public void addBatch(List<Employee> employees) throws DataAccessException {
+        User current = SessionContext.getCurrentUser();
+        int createdByUserId = current != null ? current.getUserId() : 0;
+        employeeDAO.insertBatch(employees, createdByUserId);
+    }
+
     public Optional<Employee> findById(int id) throws DataAccessException {
         if (id <= 0) return Optional.empty();
         return employeeDAO.findById(id);

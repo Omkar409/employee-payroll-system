@@ -35,6 +35,14 @@ public class InMemoryEmployeeDAO implements EmployeeDAO {
     }
 
     @Override
+    public void insertBatch(List<Employee> employees, int createdByUserId) throws DataAccessException {
+        if (employees == null || employees.isEmpty()) return;
+        for (Employee e : employees) {
+            insert(e, createdByUserId);
+        }
+    }
+
+    @Override
     public Optional<Employee> findById(int employeeId) throws DataAccessException {
         return Optional.ofNullable(storage.get(employeeId));
     }

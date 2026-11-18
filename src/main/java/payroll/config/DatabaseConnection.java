@@ -9,11 +9,6 @@ import java.sql.Statement;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-/**
- * Thread-safe singleton factory for JDBC connections.
- * Loads db.properties from the classpath.
- */
 public final class DatabaseConnection {
 
     private static final Logger LOGGER = Logger.getLogger(DatabaseConnection.class.getName());

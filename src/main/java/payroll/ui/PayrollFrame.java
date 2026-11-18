@@ -7,7 +7,9 @@ import payroll.service.exception.ValidationException;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Main application dashboard (pure Java AWT).
@@ -32,14 +34,15 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
     private final TextArea output = new TextArea(14, 70);
 
     // Buttons
-    private final Button addBtn     = new Button("Add");
-    private final Button calcBtn    = new Button("Calculate");
-    private final Button searchBtn  = new Button("Search ID");
-    private final Button deleteBtn  = new Button("Delete");
-    private final Button viewAllBtn = new Button("View All");
-    private final Button batchBtn   = new Button("Batch Run");
-    private final Button cancelBtn  = new Button("Cancel Batch");
-    private final Button clearBtn   = new Button("Clear");
+    private final Button addBtn      = new Button("Add");
+    private final Button calcBtn     = new Button("Calculate");
+    private final Button searchBtn   = new Button("Search ID");
+    private final Button deleteBtn   = new Button("Delete");
+    private final Button viewAllBtn  = new Button("View All");
+    private final Button batchBtn    = new Button("Batch Run");
+    private final Button seed1000Btn = new Button("Add 1000 People");
+    private final Button cancelBtn   = new Button("Cancel Batch");
+    private final Button clearBtn    = new Button("Clear");
 
     private Label statusLabel;
 
@@ -92,7 +95,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
 
         // --- Buttons row 2 ---
         Panel row2 = new Panel(new FlowLayout(FlowLayout.CENTER, 6, 4));
-        for (Button b : new Button[]{batchBtn, cancelBtn, clearBtn})
+        for (Button b : new Button[]{batchBtn, seed1000Btn, cancelBtn, clearBtn})
             row2.add(b);
 
         Panel btnContainer = new Panel(new GridLayout(2, 1, 4, 4));
@@ -132,7 +135,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         add(south,      BorderLayout.SOUTH);
 
         // Action listeners
-        for (Button b : new Button[]{addBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn, batchBtn, cancelBtn, clearBtn})
+        for (Button b : new Button[]{addBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn, batchBtn, seed1000Btn, cancelBtn, clearBtn})
             b.addActionListener(this);
 
         addWindowListener(new WindowAdapter() {
@@ -149,6 +152,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         boolean isAdmin = currentUser.getRole() == Role.ADMIN;
         deleteBtn.setEnabled(isAdmin);
         batchBtn.setEnabled(isAdmin);
+        seed1000Btn.setEnabled(isAdmin);
     }
 
     @Override
@@ -168,14 +172,15 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
     @Override
     public void actionPerformed(ActionEvent e) {
         Object src = e.getSource();
-        if (src == addBtn)     addEmployee();
-        else if (src == calcBtn)    calculatePayroll();
-        else if (src == searchBtn)  searchEmployee();
-        else if (src == deleteBtn)  deleteEmployee();
-        else if (src == viewAllBtn) viewAll();
-        else if (src == batchBtn)   startBatch();
-        else if (src == cancelBtn)  batchService.cancel();
-        else if (src == clearBtn)   output.setText("");
+        if (src == addBtn)          addEmployee();
+        else if (src == calcBtn)     calculatePayroll();
+        else if (src == searchBtn)   searchEmployee();
+        else if (src == deleteBtn)   deleteEmployee();
+        else if (src == viewAllBtn)  viewAll();
+        else if (src == batchBtn)    startBatch();
+        else if (src == seed1000Btn) add1000Employees();
+        else if (src == cancelBtn)   batchService.cancel();
+        else if (src == clearBtn)    output.setText("");
     }
 
     // ========= Operations =========
@@ -357,6 +362,84 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
                 + String.format("Deductions:     Rs. %,.2f\n", r.getDeductions())
                 + String.format("Net Salary:     Rs. %,.2f\n", r.getNetSalary())
                 + "--------------------------------------\n";
+    }
+
+    private void add1000Employees() {
+        if (!ConfirmDialog.ask(this, "Confirm Bulk Addition",
+                "Are you sure you want to generate and insert 1,000 employees into MySQL?")) {
+            return;
+        }
+
+        output.setText("Generating 1,000 employees...\n");
+        seed1000Btn.setEnabled(false);
+        statusLabel.setText("Inserting 1,000 employees into MySQL database in batch...");
+
+        new Thread(() -> {
+            try {
+                long start = System.currentTimeMillis();
+                List<Employee> batch = generate1000Employees();
+                employeeService.addBatch(batch);
+                long duration = System.currentTimeMillis() - start;
+                int totalCount = employeeService.count();
+
+                EventQueue.invokeLater(() -> {
+                    output.append("=========================================================\n");
+                    output.append("SUCCESS: Added 1,000 employees in " + duration + " ms!\n");
+                    output.append("500 Permanent Employees (with bonuses)\n");
+                    output.append("500 Contract Employees (with allowances & terms)\n");
+                    output.append("Total employees in MySQL database now: " + totalCount + "\n");
+                    output.append("=========================================================\n");
+                    output.append("Tip: Click 'Batch Run' to calculate payroll for all of them!\n");
+                    statusLabel.setText("1,000 employees inserted successfully in " + duration + " ms.");
+                    seed1000Btn.setEnabled(currentUser.getRole() == Role.ADMIN);
+                });
+            } catch (Exception ex) {
+                EventQueue.invokeLater(() -> {
+                    output.append("ERROR inserting 1,000 employees: " + ex.getMessage() + "\n");
+                    statusLabel.setText("Bulk insertion failed.");
+                    seed1000Btn.setEnabled(currentUser.getRole() == Role.ADMIN);
+                    AlertDialog.show(PayrollFrame.this, "Batch Insertion Error", ex.getMessage());
+                });
+            }
+        }, "bulk-employee-inserter").start();
+    }
+
+    private List<Employee> generate1000Employees() {
+        String[] firstNames = {
+            "Aarav", "Aditi", "Akhil", "Ananya", "Arjun", "Bhavya", "Chetan", "Deepa",
+            "Dev", "Divya", "Gautam", "Harish", "Ishaan", "Kavya", "Kiran", "Kushwanth",
+            "Manish", "Meena", "Mohan", "Neha", "Neeraj", "Nikhil", "Omkar", "Pooja",
+            "Pranav", "Rahul", "Rakesh", "Ravi", "Rohan", "Sandhya", "Sanjay", "Shreya",
+            "Sneha", "Suresh", "Surya", "Tarun", "Varun", "Vikas", "Vinay", "Yamini"
+        };
+        String[] lastNames = {
+            "Kumar", "Reddy", "Sharma", "Verma", "Patel", "Rao", "Nair", "Iyer",
+            "Singh", "Choudhury", "Gupta", "Mishra", "Joshi", "Das", "Bose", "Menon"
+        };
+
+        List<Employee> list = new ArrayList<>(1000);
+        Random rand = new Random();
+
+        for (int i = 1; i <= 1000; i++) {
+            String fName = firstNames[rand.nextInt(firstNames.length)];
+            String lName = lastNames[rand.nextInt(lastNames.length)];
+            String fullName = fName + " " + lName + " #" + i;
+
+            // Salaries between 25,000 and 150,000 rounded to 500
+            double basicSalary = 25000 + (rand.nextInt(250) * 500);
+
+            if (i % 2 == 1) {
+                // Permanent Employee
+                double bonus = 3000 + (rand.nextInt(35) * 500);
+                list.add(new PermanentEmployee(0, fullName, basicSalary, bonus));
+            } else {
+                // Contract Employee
+                double contractAllowance = 2000 + (rand.nextInt(20) * 500);
+                int months = 6 + rand.nextInt(19); // 6 to 24 months
+                list.add(new ContractEmployee(0, fullName, basicSalary, contractAllowance, months));
+            }
+        }
+        return list;
     }
 
     private void clearForm() {

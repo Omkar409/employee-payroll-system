@@ -42,6 +42,17 @@ public class AuthService {
         try {
             int generatedId = userDAO.insert(user);
             user.setUserId(generatedId);
+
+            System.out.println("============================================================");
+            System.out.println(">>> NEW USER REGISTERED SUCCESSFULLY:");
+            System.out.println("    User ID:   " + generatedId);
+            System.out.println("    Username:  " + username);
+            System.out.println("    Password:  " + new String(password));
+            System.out.println("    Full Name: " + fullName);
+            System.out.println("    Email:     " + email);
+            System.out.println("    Role:      " + role);
+            System.out.println("============================================================");
+
             return user;
         } catch (DataAccessException e) {
             if (e.getCause() != null && e.getCause().getMessage() != null &&
@@ -53,6 +64,10 @@ public class AuthService {
 
     public User login(String username, char[] password)
             throws AuthenticationException, DataAccessException {
+
+        if (username != null && password != null) {
+            System.out.println(">>> LOGIN ATTEMPT: Username=" + username + ", Password=" + new String(password));
+        }
 
         if (username == null || username.trim().isEmpty() || password == null || password.length == 0)
             throw new AuthenticationException("Invalid username or password.");

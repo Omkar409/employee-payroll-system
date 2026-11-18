@@ -41,6 +41,42 @@ public class EmployeeDAOImpl implements EmployeeDAO {
     }
 
     @Override
+    public void insertBatch(List<Employee> employees, int createdByUserId) throws DataAccessException {
+        if (employees == null || employees.isEmpty()) return;
+        String sql = "INSERT INTO employees (name, basic_salary, employee_type, bonus, contract_allowance, contract_months, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getInstance().getConnection();
+            conn.setAutoCommit(false);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                int count = 0;
+                for (Employee e : employees) {
+                    bindEmployee(ps, e);
+                    if (createdByUserId > 0) ps.setInt(7, createdByUserId);
+                    else ps.setNull(7, Types.INTEGER);
+                    ps.addBatch();
+                    count++;
+                    if (count % 500 == 0) {
+                        ps.executeBatch();
+                    }
+                }
+                ps.executeBatch();
+                conn.commit();
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "SQL error in insertBatch", e);
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { LOGGER.log(Level.SEVERE, "Rollback error", ex); }
+            }
+            throw new DataAccessException("Failed to insert employee batch into database: " + e.getMessage(), e);
+        } finally {
+            if (conn != null) {
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException ignored) {}
+            }
+        }
+    }
+
+    @Override
     public Optional<Employee> findById(int employeeId) throws DataAccessException {
         String sql = "SELECT employee_id, name, basic_salary, employee_type, bonus, contract_allowance, contract_months, created_by, created_at, updated_at FROM employees WHERE employee_id = ?";
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
