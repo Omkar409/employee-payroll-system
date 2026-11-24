@@ -50,6 +50,7 @@ public class TestMatrixSuite {
         testInputValidation();
         testInMemoryDAO();
         testFileIOAndPersistence();
+        testEmployeeUpdateAndPaymentSimulation(dbOk);
 
         if (dbOk) {
             testSqlInjectionResilience();
@@ -247,6 +248,121 @@ public class TestMatrixSuite {
             new File(testDataFile).delete();
             new File(testBackupFile).delete();
             new File(testReportFile).delete();
+        }
+    }
+
+    private static void testEmployeeUpdateAndPaymentSimulation(boolean dbOk) {
+        System.out.println(">>> Section: Employee Update, Bank Accounts & Payment Simulation");
+
+        // 1. BankAccountStore tests
+        BankAccountStore.setAccount(999, "HDFC000999888");
+        String retrievedAcc = BankAccountStore.getAccount(999);
+        assertTrue("BANK1", "BankAccountStore sets and gets custom bank account", "HDFC000999888".equals(retrievedAcc));
+
+        String defaultAcc = BankAccountStore.getAccount(55555);
+        assertTrue("BANK2", "BankAccountStore generates valid default account for unset ID", defaultAcc.startsWith("SBIN") && defaultAcc.contains("55555"));
+
+        // 2. Employee Bank Account integration
+        PermanentEmployee emp1 = new PermanentEmployee(1, "Deepa Sharma", 50000.0, 4000.0);
+        emp1.setBankAccount("ICIC00012345");
+        assertTrue("BANK3", "Employee model sets and gets custom bank account", "ICIC00012345".equals(emp1.getBankAccount()));
+
+        // 3. Employee Salary Update test
+        if (dbOk) {
+            try {
+                EmployeeDAOImpl empDAO = new EmployeeDAOImpl();
+                EmployeeService empService = new EmployeeService(empDAO, new StandardPayrollCalculator());
+
+                // Insert a test employee
+                PermanentEmployee testEmp = new PermanentEmployee(0, "Update Test Emp", 45000.0, 3000.0);
+                testEmp.setBankAccount("SBIN000888111");
+                int newId = empService.addEmployee(testEmp);
+                assertTrue("UPD1a", "Employee inserted for update test", newId > 0);
+
+                // Update their salary
+                testEmp.setEmployeeId(newId);
+                testEmp.setName("Update Test Emp Modified");
+                testEmp.setBasicSalary(55000.0);
+                testEmp.setBonus(6000.0);
+                testEmp.setBankAccount("HDFC000777222");
+
+                empService.updateEmployee(testEmp);
+
+                // Verify updated in DB
+                var foundOpt = empService.findById(newId);
+                assertTrue("UPD1b", "Updated employee retrieved from database", foundOpt.isPresent());
+                if (foundOpt.isPresent()) {
+                    Employee updated = foundOpt.get();
+                    assertTrue("UPD1c", "Updated employee reflects new basic salary", Math.abs(updated.getBasicSalary() - 55000.0) < 0.01);
+                    assertTrue("UPD1d", "Updated employee reflects new name", "Update Test Emp Modified".equals(updated.getName()));
+                    if (updated instanceof PermanentEmployee pe) {
+                        assertTrue("UPD1e", "Updated employee reflects new bonus", Math.abs(pe.getBonus() - 6000.0) < 0.01);
+                    }
+                }
+
+                // Verify updated payroll calculation
+                PayrollResult pr = empService.calculatePayroll(newId);
+                // Gross = 55000 + 6000 = 61000, Deductions = 55000 * 0.20 = 11000, Net = 50000
+                assertTrue("UPD1f", "Recalculated payroll reflects updated salary",
+                        Math.abs(pr.getGrossSalary() - 61000.0) < 0.01 &&
+                        Math.abs(pr.getNetSalary() - 50000.0) < 0.01);
+
+                // Clean up test employee
+                empDAO.deleteById(newId);
+            } catch (Exception e) {
+                assertTrue("UPD-ERR", "Unexpected exception during update test: " + e.getMessage(), false);
+            }
+        }
+
+        // 4. Payment Simulation Pipeline tests
+        try {
+            PermanentEmployee p1 = new PermanentEmployee(1, "Sim User 1", 50000.0, 5000.0); // gross 55000, ded 10000, net 45000
+            ContractEmployee c1 = new ContractEmployee(2, "Sim User 2", 40000.0, 2000.0, 12); // gross 42000, ded 4200, net 37800
+            p1.setBankAccount("SBIN0001111111");
+            c1.setBankAccount("HDFC0002222222");
+
+            List<Employee> simList = List.of(p1, c1);
+            StandardPayrollCalculator calc = new StandardPayrollCalculator();
+            PaymentSimulationService simService = new PaymentSimulationService();
+
+            final int[] progressCount = {0};
+            final boolean[] completed = {false};
+
+            PaymentSimulationSummary summary = simService.simulatePayout(simList, calc, new PaymentSimulationListener() {
+                @Override
+                public void onProgress(int processed, int total, DisbursementRecord record) {
+                    progressCount[0] = processed;
+                }
+
+                @Override
+                public void onComplete(PaymentSimulationSummary s) {
+                    completed[0] = true;
+                }
+
+                @Override
+                public void onError(Exception error) {}
+            });
+
+            assertTrue("SIM1a", "Payment simulation completes for all employees", progressCount[0] == 2 && completed[0]);
+            assertTrue("SIM1b", "Payment simulation records total disbursed correctly",
+                    Math.abs(summary.totalDisbursed() - (45000.0 + 37800.0)) < 0.01);
+            assertTrue("SIM1c", "Payment simulation debits company treasury correctly",
+                    Math.abs(summary.companyStartingBalance() - summary.totalDisbursed() - summary.companyEndingBalance()) < 0.01);
+            assertTrue("SIM1d", "Payment simulation generates distinct non-empty UTR for each employee",
+                    summary.disbursements().get(0).utr().startsWith("UTR-SRM-") &&
+                    summary.disbursements().get(1).utr().startsWith("UTR-SRM-") &&
+                    !summary.disbursements().get(0).utr().equals(summary.disbursements().get(1).utr()));
+
+            String report = summary.formatSummaryReport();
+            assertTrue("SIM2a", "Summary report includes simulation disclaimer",
+                    report.contains("SIMULATION MODE - NO ACTUAL CURRENCY TRANSFERRED"));
+            assertTrue("SIM2b", "Summary report contains debit account details",
+                    report.contains("SRM-CORP-TREASURY-001"));
+            assertTrue("SIM2c", "Summary report contains employee accounts and UTRs",
+                    report.contains("SBIN0001111111") && report.contains("HDFC0002222222"));
+
+        } catch (Exception e) {
+            assertTrue("SIM-ERR", "Unexpected exception during Payment Simulation test: " + e.getMessage(), false);
         }
     }
 

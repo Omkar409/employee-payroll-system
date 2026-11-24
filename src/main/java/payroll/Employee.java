@@ -1,5 +1,6 @@
 package payroll;
 
+import payroll.service.BankAccountStore;
 import java.time.LocalDateTime;
 
 /**
@@ -14,6 +15,7 @@ public abstract class Employee implements java.io.Serializable {
     private String name;
     private double basicSalary;
     private final EmployeeType employeeType;
+    private String bankAccount;
     private Integer createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -46,6 +48,20 @@ public abstract class Employee implements java.io.Serializable {
 
     public EmployeeType getEmployeeType() { return employeeType; }
 
+    public String getBankAccount() {
+        if (bankAccount == null || bankAccount.trim().isEmpty()) {
+            return BankAccountStore.getAccount(employeeId);
+        }
+        return bankAccount;
+    }
+
+    public void setBankAccount(String bankAccount) {
+        this.bankAccount = bankAccount;
+        if (employeeId > 0 && bankAccount != null && !bankAccount.trim().isEmpty()) {
+            BankAccountStore.setAccount(employeeId, bankAccount);
+        }
+    }
+
     public Integer getCreatedBy() { return createdBy; }
     public void setCreatedBy(Integer createdBy) { this.createdBy = createdBy; }
 
@@ -57,7 +73,7 @@ public abstract class Employee implements java.io.Serializable {
 
     @Override
     public String toString() {
-        return String.format("[%d] %-20s | %-9s | Basic: %.2f",
-                employeeId, name, employeeType.name(), basicSalary);
+        return String.format("[%d] %-20s | %-9s | Basic: %.2f | A/C: %s",
+                employeeId, name, employeeType.name(), basicSalary, getBankAccount());
     }
 }

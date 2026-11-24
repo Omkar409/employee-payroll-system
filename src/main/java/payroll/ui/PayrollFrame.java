@@ -31,23 +31,26 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
     private final PayrollFileService fileService = new PayrollFileService();
 
     // Form fields
-    private final TextField idField      = new TextField(12);
-    private final TextField nameField    = new TextField(18);
-    private final Choice   typeChoice   = new Choice();
-    private final TextField salaryField  = new TextField(12);
-    private final TextField extraField   = new TextField(12);
-    private final Label     extraLabel   = new Label("Allowance/Bonus:");
+    private final TextField idField          = new TextField(12);
+    private final TextField nameField        = new TextField(18);
+    private final Choice   typeChoice       = new Choice();
+    private final TextField salaryField      = new TextField(12);
+    private final TextField extraField       = new TextField(12);
+    private final Label     extraLabel       = new Label("Allowance/Bonus:");
+    private final TextField bankAccountField = new TextField(18);
 
     // Output area
     private final TextArea output = new TextArea(14, 70);
 
     // Buttons
     private final Button addBtn        = new Button("Add");
+    private final Button updateBtn     = new Button("Update Salary");
     private final Button calcBtn       = new Button("Calculate");
     private final Button searchBtn     = new Button("Search ID");
     private final Button deleteBtn     = new Button("Delete");
     private final Button viewAllBtn    = new Button("View All");
     private final Button batchBtn      = new Button("Batch Run");
+    private final Button simBtn        = new Button("Payment Simulation");
     private final Button seed1000Btn   = new Button("Add 1000 People");
     private final Button cancelBtn     = new Button("Cancel Batch");
     private final Button clearBtn      = new Button("Clear");
@@ -68,14 +71,15 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         buildUI();
         applyRoleRestrictions();
 
-        setSize(860, 640);
+        setSize(880, 680);
         setLocationRelativeTo(null);
         setVisible(false);
 
         output.setText("Welcome, " + currentUser.getFullName() + "!\n"
                 + "Role: " + currentUser.getRole().name() + "\n"
                 + "=========================================================\n"
-                + "Use the form above to manage employees and run payroll.\n"
+                + "Use the form above to add, update, search, or calculate payroll.\n"
+                + "Click 'Payment Simulation' to simulate bulk direct bank deposits.\n"
                 + "File I/O buttons below allow saving, loading, report export, and backup.\n");
     }
 
@@ -88,27 +92,28 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         title.setFont(new Font("SansSerif", Font.BOLD, 14));
         add(title, BorderLayout.NORTH);
 
-        // --- Form (GridLayout 5x2) ---
-        Panel form = new Panel(new GridLayout(5, 2, 6, 6));
+        // --- Form (GridLayout 6x2) ---
+        Panel form = new Panel(new GridLayout(6, 2, 6, 6));
         typeChoice.add("Permanent");
         typeChoice.add("Contract");
         typeChoice.addItemListener(this);
 
-        form.add(new Label("Employee ID:")); form.add(idField);
-        form.add(new Label("Name:"));        form.add(nameField);
-        form.add(new Label("Category:"));   form.add(typeChoice);
+        form.add(new Label("Employee ID:"));         form.add(idField);
+        form.add(new Label("Name:"));                form.add(nameField);
+        form.add(new Label("Category:"));            form.add(typeChoice);
         form.add(new Label("Basic Salary (Rs.):"));  form.add(salaryField);
-        form.add(extraLabel);               form.add(extraField);
+        form.add(extraLabel);                        form.add(extraField);
+        form.add(new Label("Bank Account No:"));     form.add(bankAccountField);
         extraField.setEnabled(false);
 
         // --- Buttons row 1: CRUD & Lookup ---
         Panel row1 = new Panel(new FlowLayout(FlowLayout.CENTER, 6, 4));
-        for (Button b : new Button[]{addBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn})
+        for (Button b : new Button[]{addBtn, updateBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn})
             row1.add(b);
 
-        // --- Buttons row 2: Batch & Maintenance ---
+        // --- Buttons row 2: Batch & Payment Simulation ---
         Panel row2 = new Panel(new FlowLayout(FlowLayout.CENTER, 6, 4));
-        for (Button b : new Button[]{batchBtn, seed1000Btn, cancelBtn, clearBtn})
+        for (Button b : new Button[]{batchBtn, simBtn, seed1000Btn, cancelBtn, clearBtn})
             row2.add(b);
 
         // --- Buttons row 3: File I/O & Reports ---
@@ -154,8 +159,8 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         add(south,      BorderLayout.SOUTH);
 
         // Action listeners
-        for (Button b : new Button[]{addBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn,
-                                     batchBtn, seed1000Btn, cancelBtn, clearBtn,
+        for (Button b : new Button[]{addBtn, updateBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn,
+                                     batchBtn, simBtn, seed1000Btn, cancelBtn, clearBtn,
                                      saveFileBtn, loadFileBtn, exportRepBtn, backupFileBtn})
             b.addActionListener(this);
 
@@ -173,6 +178,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         boolean isAdmin = currentUser.getRole() == Role.ADMIN;
         deleteBtn.setEnabled(isAdmin);
         batchBtn.setEnabled(isAdmin);
+        simBtn.setEnabled(isAdmin);
         seed1000Btn.setEnabled(isAdmin);
         loadFileBtn.setEnabled(isAdmin);
     }
@@ -195,11 +201,13 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
     public void actionPerformed(ActionEvent e) {
         Object src = e.getSource();
         if (src == addBtn)             addEmployee();
+        else if (src == updateBtn)      updateEmployee();
         else if (src == calcBtn)        calculatePayroll();
         else if (src == searchBtn)      searchEmployee();
         else if (src == deleteBtn)      deleteEmployee();
         else if (src == viewAllBtn)     viewAll();
         else if (src == batchBtn)       startBatch();
+        else if (src == simBtn)         startPaymentSimulation();
         else if (src == seed1000Btn)    add1000Employees();
         else if (src == cancelBtn)      batchService.cancel();
         else if (src == clearBtn)       output.setText("");
@@ -229,13 +237,81 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
             }
             emp.setEmployeeId(0); // let DB assign
             int generated = employeeService.addEmployee(emp);
+
+            String bankAcc = bankAccountField.getText().trim();
+            if (bankAcc.isEmpty()) {
+                bankAcc = BankAccountStore.generateDefaultAccount(generated);
+            }
+            emp.setBankAccount(bankAcc);
+            BankAccountStore.setAccount(generated, bankAcc);
+
             output.setText("SUCCESS: Employee added with DB ID: " + generated + "\n"
-                    + "Name: " + name + "\nType: " + type + "\nBasic: Rs. " + String.format("%.2f", salary));
+                    + "Name: " + name + "\nType: " + type + "\nBasic: Rs. " + String.format("%.2f", salary)
+                    + "\nBank Account: " + bankAcc);
             clearForm();
         } catch (NumberFormatException ex) {
             output.setText("Input Error: Please enter valid numbers for ID, Salary, and Allowance/Bonus.");
         } catch (ValidationException | DataAccessException ex) {
             output.setText("Error: " + ex.getMessage());
+        }
+    }
+
+    private void updateEmployee() {
+        try {
+            String idStr = idField.getText().trim();
+            if (idStr.isEmpty()) {
+                output.setText("Error: Enter an Employee ID to update salary and credentials.");
+                return;
+            }
+            int id = Integer.parseInt(idStr);
+            String name = nameField.getText().trim();
+            if (name.isEmpty()) { output.setText("Error: Name is required for update."); return; }
+            double salary = Double.parseDouble(salaryField.getText().trim());
+            String type = typeChoice.getSelectedItem();
+
+            Employee emp;
+            if ("Contract".equalsIgnoreCase(type)) {
+                double allowance = extraField.getText().trim().isEmpty() ? 0 : Double.parseDouble(extraField.getText().trim());
+                emp = new ContractEmployee(id, name, salary, allowance, 12);
+            } else {
+                double bonus = extraField.getText().trim().isEmpty() ? 0 : Double.parseDouble(extraField.getText().trim());
+                emp = new PermanentEmployee(id, name, salary, bonus);
+            }
+
+            String bankAcc = bankAccountField.getText().trim();
+            if (!bankAcc.isEmpty()) {
+                emp.setBankAccount(bankAcc);
+                BankAccountStore.setAccount(id, bankAcc);
+            }
+
+            employeeService.updateEmployee(emp);
+            PayrollResult r = employeeService.calculatePayroll(id);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("=========================================================\n");
+            sb.append("SUCCESS: EMPLOYEE SALARY & CREDENTIALS UPDATED\n");
+            sb.append("=========================================================\n");
+            sb.append(String.format("Employee ID:     %d\n", id));
+            sb.append(String.format("Employee Name:   %s\n", name));
+            sb.append(String.format("Category:        %s\n", type));
+            sb.append(String.format("New Basic:       Rs. %,.2f\n", salary));
+            if (emp instanceof PermanentEmployee pe) {
+                sb.append(String.format("Bonus:           Rs. %,.2f\n", pe.getBonus()));
+            } else if (emp instanceof ContractEmployee ce) {
+                sb.append(String.format("Contract Allow.: Rs. %,.2f\n", ce.getContractAllowance()));
+            }
+            sb.append(String.format("Bank Account:    %s\n", emp.getBankAccount()));
+            sb.append("---------------------------------------------------------\n");
+            sb.append(String.format("Recalculated Net:Rs. %,.2f\n", r.getNetSalary()));
+            sb.append("=========================================================\n");
+
+            output.setText(sb.toString());
+            statusLabel.setText("Employee ID " + id + " updated successfully.");
+        } catch (NumberFormatException ex) {
+            output.setText("Input Error: Valid numbers required for ID, Salary, and Allowance/Bonus.");
+        } catch (ValidationException | DataAccessException ex) {
+            output.setText("Update Error: " + ex.getMessage());
+            AlertDialog.show(this, "Update Error", ex.getMessage());
         }
     }
 
@@ -262,6 +338,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
                     idField.setText(String.valueOf(emp.getEmployeeId()));
                     nameField.setText(emp.getName());
                     salaryField.setText(String.format("%.2f", emp.getBasicSalary()));
+                    bankAccountField.setText(emp.getBankAccount());
                     if (emp instanceof ContractEmployee ce) {
                         typeChoice.select("Contract");
                         extraField.setEnabled(true);
@@ -317,13 +394,16 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
             List<Employee> all = employeeService.listAll();
             if (all.isEmpty()) { output.setText("No employee records in database."); return; }
             StringBuilder sb = new StringBuilder();
-            sb.append(String.format("%-6s | %-22s | %-10s | %12s\n", "ID", "NAME", "TYPE", "BASIC SALARY"));
-            sb.append("-".repeat(60)).append("\n");
+            sb.append(String.format("%-6s | %-20s | %-10s | %-16s | %12s\n", "ID", "NAME", "TYPE", "BANK ACCOUNT", "BASIC SALARY"));
+            sb.append("-".repeat(74)).append("\n");
             for (Employee emp : all)
-                sb.append(String.format("%-6d | %-22s | %-10s | %12.2f\n",
-                        emp.getEmployeeId(), emp.getName(),
-                        emp.getEmployeeType().name(), emp.getBasicSalary()));
-            sb.append("-".repeat(60)).append("\n");
+                sb.append(String.format("%-6d | %-20s | %-10s | %-16s | %12.2f\n",
+                        emp.getEmployeeId(),
+                        emp.getName().length() > 20 ? emp.getName().substring(0, 17) + "..." : emp.getName(),
+                        emp.getEmployeeType().name(),
+                        emp.getBankAccount(),
+                        emp.getBasicSalary()));
+            sb.append("-".repeat(74)).append("\n");
             sb.append("Total: ").append(all.size()).append(" employees\n");
             output.setText(sb.toString());
         } catch (DataAccessException e) {
@@ -445,6 +525,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
 
         List<Employee> list = new ArrayList<>(1000);
         Random rand = new Random();
+        String[] bankPrefixes = {"SBIN", "HDFC", "ICIC", "PUNB", "BARB", "UBIN"};
 
         for (int i = 1; i <= 1000; i++) {
             String fName = firstNames[rand.nextInt(firstNames.length)];
@@ -454,18 +535,117 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
             // Salaries between 25,000 and 150,000 rounded to 500
             double basicSalary = 25000 + (rand.nextInt(250) * 500);
 
+            Employee emp;
             if (i % 2 == 1) {
                 // Permanent Employee
                 double bonus = 3000 + (rand.nextInt(35) * 500);
-                list.add(new PermanentEmployee(0, fullName, basicSalary, bonus));
+                emp = new PermanentEmployee(0, fullName, basicSalary, bonus);
             } else {
                 // Contract Employee
                 double contractAllowance = 2000 + (rand.nextInt(20) * 500);
                 int months = 6 + rand.nextInt(19); // 6 to 24 months
-                list.add(new ContractEmployee(0, fullName, basicSalary, contractAllowance, months));
+                emp = new ContractEmployee(0, fullName, basicSalary, contractAllowance, months);
             }
+
+            String prefix = bankPrefixes[rand.nextInt(bankPrefixes.length)];
+            String bankAccount = prefix + String.format("%010d", 1000000 + i);
+            emp.setBankAccount(bankAccount);
+            list.add(emp);
         }
         return list;
+    }
+
+    // ========= Bank Salary Payment Simulation =========
+
+    private void startPaymentSimulation() {
+        if (batchService.isRunning()) {
+            output.setText("A batch process is currently running. Please wait for it to finish.");
+            return;
+        }
+
+        try {
+            List<Employee> all = employeeService.listAll();
+            if (all.isEmpty()) {
+                output.setText("No employees found in database. Please add employees or click 'Add 1000 People' first.");
+                return;
+            }
+
+            boolean confirm = ConfirmDialog.ask(this, "Bank Salary Disbursement Simulation",
+                    "Simulate bulk automated direct bank deposits for " + all.size() + " employees\n"
+                    + "from Company Treasury Account (SRM-CORP-TREASURY-001)?\n\n"
+                    + "[Note: Simulation mode - of course no actual money will be transferred]");
+            if (!confirm) {
+                output.setText("Payment simulation cancelled.");
+                return;
+            }
+
+            output.setText("========================================================================================\n");
+            output.append("INITIALIZING AUTOMATED CLEARING HOUSE (ACH / NEFT) BANKING GATEWAY SIMULATION...\n");
+            output.append("DEBIT ACCOUNT: State Bank of India | SRM-CORP-TREASURY-001\n");
+            output.append("[NOTE: SIMULATION MODE - NO ACTUAL CURRENCY TRANSFERRED - DEMONSTRATION PURPOSES ONLY]\n");
+            output.append("========================================================================================\n\n");
+            output.append("Starting automated disbursement pipeline...\n\n");
+
+            simBtn.setEnabled(false);
+            statusLabel.setText("Starting payment simulation for " + all.size() + " employees...");
+
+            new Thread(() -> {
+                try {
+                    PaymentSimulationService simService = new PaymentSimulationService();
+                    simService.simulatePayout(all, new StandardPayrollCalculator(), new PaymentSimulationListener() {
+                        @Override
+                        public void onProgress(int processed, int total, DisbursementRecord record) {
+                            EventQueue.invokeLater(() -> {
+                                statusLabel.setText(String.format("Transferring %d/%d: %s -> A/C %s (Rs. %,.2f)",
+                                        processed, total, record.employeeName(), record.bankAccount(), record.netAmount()));
+                                if (total <= 50 || processed % 10 == 0 || processed == total) {
+                                    output.append(String.format("  [SUCCESS] Emp #%-5d %-20s -> A/C %-16s | Net: Rs. %10.2f | %s\n",
+                                            record.employeeId(),
+                                            record.employeeName().length() > 20 ? record.employeeName().substring(0, 17) + "..." : record.employeeName(),
+                                            record.bankAccount(),
+                                            record.netAmount(),
+                                            record.utr()));
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onComplete(PaymentSimulationSummary summary) {
+                            EventQueue.invokeLater(() -> {
+                                output.append("\n" + summary.formatSummaryReport());
+                                statusLabel.setText("Disbursement simulation completed: " + summary.totalEmployees() + " employees paid.");
+                                simBtn.setEnabled(currentUser.getRole() == Role.ADMIN);
+                                AlertDialog.show(PayrollFrame.this, "Payment Simulation Complete",
+                                        "Bank Disbursement Simulation Finished!\n\n"
+                                        + "Recipients Paid: " + summary.totalEmployees() + "\n"
+                                        + "Total Disbursed: Rs. " + String.format("%,.2f", summary.totalDisbursed()) + "\n"
+                                        + "Company Ending Balance: Rs. " + String.format("%,.2f", summary.companyEndingBalance()) + "\n"
+                                        + "Saved to: data/payment_simulation_report.txt\n\n"
+                                        + "(Simulation mode - no actual currency transferred)");
+                            });
+                        }
+
+                        @Override
+                        public void onError(Exception cause) {
+                            EventQueue.invokeLater(() -> {
+                                output.append("\nSimulation ERROR: " + cause.getMessage() + "\n");
+                                statusLabel.setText("Payment simulation failed.");
+                                simBtn.setEnabled(currentUser.getRole() == Role.ADMIN);
+                                AlertDialog.show(PayrollFrame.this, "Simulation Error", cause.getMessage());
+                            });
+                        }
+                    });
+                } catch (Exception ex) {
+                    EventQueue.invokeLater(() -> {
+                        output.append("Simulation execution error: " + ex.getMessage() + "\n");
+                        simBtn.setEnabled(currentUser.getRole() == Role.ADMIN);
+                    });
+                }
+            }, "payment-simulation-thread").start();
+
+        } catch (DataAccessException ex) {
+            output.setText("Database error loading employees: " + ex.getMessage());
+        }
     }
 
     // ========= File I/O Operations =========
@@ -487,7 +667,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
             sb.append("File Path:     ").append(f.getPath()).append(" (").append(f.getAbsolutePath()).append(")\n");
             sb.append("File Size:     ").append(f.length()).append(" bytes\n");
             sb.append("Stream Type:   Character Stream (BufferedWriter / FileWriter)\n");
-            sb.append("Format:        CSV (ID, Name, Type, Basic, Bonus/Allowance, Months)\n");
+            sb.append("Format:        CSV (ID, Name, Type, Basic, Bonus/Allowance, Months, Bank Account)\n");
             sb.append("=========================================================\n");
             sb.append("Tip: Click 'Backup File' to create a byte-stream backup (FileInputStream/FileOutputStream).\n");
             output.setText(sb.toString());
@@ -612,5 +792,6 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         nameField.setText("");
         salaryField.setText("");
         extraField.setText("");
+        bankAccountField.setText("");
     }
 }
