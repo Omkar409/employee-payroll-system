@@ -22,7 +22,6 @@ import java.util.Random;
 public class PayrollFrame extends Frame implements ActionListener, ItemListener {
 
     private static final String DATA_FILE = "data/employees.txt";
-    private static final String BACKUP_FILE = "data/employees_backup.txt";
     private static final String REPORT_FILE = "data/payroll_report.txt";
 
     private final User currentUser;
@@ -48,16 +47,11 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
     private final Button calcBtn       = new Button("Calculate");
     private final Button searchBtn     = new Button("Search ID");
     private final Button deleteBtn     = new Button("Delete");
-    private final Button viewAllBtn    = new Button("View All");
     private final Button batchBtn      = new Button("Batch Run");
     private final Button simBtn        = new Button("Payment Simulation");
-    private final Button seed1000Btn   = new Button("Add 1000 People");
-    private final Button cancelBtn     = new Button("Cancel Batch");
-    private final Button clearBtn      = new Button("Clear");
     private final Button saveFileBtn   = new Button("Save Records");
-    private final Button loadFileBtn   = new Button("Load Records");
     private final Button exportRepBtn  = new Button("Export Report");
-    private final Button backupFileBtn = new Button("Backup File");
+    private final Button clearBtn      = new Button("Clear");
 
     private Label statusLabel;
 
@@ -71,7 +65,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         buildUI();
         applyRoleRestrictions();
 
-        setSize(880, 680);
+        setSize(840, 600);
         setLocationRelativeTo(null);
         setVisible(false);
 
@@ -80,7 +74,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
                 + "=========================================================\n"
                 + "Use the form above to add, update, search, or calculate payroll.\n"
                 + "Click 'Payment Simulation' to simulate bulk direct bank deposits.\n"
-                + "File I/O buttons below allow saving, loading, report export, and backup.\n");
+                + "Click 'Save Records' or 'Export Report' for file outputs.\n");
     }
 
     private void buildUI() {
@@ -108,23 +102,17 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
 
         // --- Buttons row 1: CRUD & Lookup ---
         Panel row1 = new Panel(new FlowLayout(FlowLayout.CENTER, 6, 4));
-        for (Button b : new Button[]{addBtn, updateBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn})
+        for (Button b : new Button[]{addBtn, updateBtn, calcBtn, searchBtn, deleteBtn})
             row1.add(b);
 
-        // --- Buttons row 2: Batch & Payment Simulation ---
+        // --- Buttons row 2: Processing, Simulation & Reports ---
         Panel row2 = new Panel(new FlowLayout(FlowLayout.CENTER, 6, 4));
-        for (Button b : new Button[]{batchBtn, simBtn, seed1000Btn, cancelBtn, clearBtn})
+        for (Button b : new Button[]{batchBtn, simBtn, saveFileBtn, exportRepBtn, clearBtn})
             row2.add(b);
 
-        // --- Buttons row 3: File I/O & Reports ---
-        Panel row3 = new Panel(new FlowLayout(FlowLayout.CENTER, 6, 4));
-        for (Button b : new Button[]{saveFileBtn, loadFileBtn, exportRepBtn, backupFileBtn})
-            row3.add(b);
-
-        Panel btnContainer = new Panel(new GridLayout(3, 1, 4, 4));
+        Panel btnContainer = new Panel(new GridLayout(2, 1, 4, 4));
         btnContainer.add(row1);
         btnContainer.add(row2);
-        btnContainer.add(row3);
 
         // --- Status bar ---
         statusLabel = new Label(" ", Label.LEFT);
@@ -159,9 +147,8 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         add(south,      BorderLayout.SOUTH);
 
         // Action listeners
-        for (Button b : new Button[]{addBtn, updateBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn,
-                                     batchBtn, simBtn, seed1000Btn, cancelBtn, clearBtn,
-                                     saveFileBtn, loadFileBtn, exportRepBtn, backupFileBtn})
+        for (Button b : new Button[]{addBtn, updateBtn, calcBtn, searchBtn, deleteBtn,
+                                     batchBtn, simBtn, saveFileBtn, exportRepBtn, clearBtn})
             b.addActionListener(this);
 
         addWindowListener(new WindowAdapter() {
@@ -179,8 +166,6 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         deleteBtn.setEnabled(isAdmin);
         batchBtn.setEnabled(isAdmin);
         simBtn.setEnabled(isAdmin);
-        seed1000Btn.setEnabled(isAdmin);
-        loadFileBtn.setEnabled(isAdmin);
     }
 
     @Override
@@ -205,16 +190,11 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         else if (src == calcBtn)        calculatePayroll();
         else if (src == searchBtn)      searchEmployee();
         else if (src == deleteBtn)      deleteEmployee();
-        else if (src == viewAllBtn)     viewAll();
         else if (src == batchBtn)       startBatch();
         else if (src == simBtn)         startPaymentSimulation();
-        else if (src == seed1000Btn)    add1000Employees();
-        else if (src == cancelBtn)      batchService.cancel();
         else if (src == clearBtn)       output.setText("");
         else if (src == saveFileBtn)    saveRecordsToFile();
-        else if (src == loadFileBtn)    loadRecordsFromFile();
         else if (src == exportRepBtn)   exportReportToFile();
-        else if (src == backupFileBtn)  backupDataFile();
     }
 
     // ========= Operations =========
@@ -389,31 +369,9 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         }
     }
 
-    private void viewAll() {
-        try {
-            List<Employee> all = employeeService.listAll();
-            if (all.isEmpty()) { output.setText("No employee records in database."); return; }
-            StringBuilder sb = new StringBuilder();
-            sb.append(String.format("%-6s | %-20s | %-10s | %-16s | %12s\n", "ID", "NAME", "TYPE", "BANK ACCOUNT", "BASIC SALARY"));
-            sb.append("-".repeat(74)).append("\n");
-            for (Employee emp : all)
-                sb.append(String.format("%-6d | %-20s | %-10s | %-16s | %12.2f\n",
-                        emp.getEmployeeId(),
-                        emp.getName().length() > 20 ? emp.getName().substring(0, 17) + "..." : emp.getName(),
-                        emp.getEmployeeType().name(),
-                        emp.getBankAccount(),
-                        emp.getBasicSalary()));
-            sb.append("-".repeat(74)).append("\n");
-            sb.append("Total: ").append(all.size()).append(" employees\n");
-            output.setText(sb.toString());
-        } catch (DataAccessException e) {
-            output.setText("Error loading employees: " + e.getMessage());
-        }
-    }
-
     private void startBatch() {
         if (batchService.isRunning()) {
-            output.setText("A batch run is already in progress. Use Cancel to stop it.");
+            output.setText("A batch run is already in progress. Please wait for it to complete.");
             return;
         }
         output.setText("Starting batch payroll run on background thread (payroll-batch)...\n");
@@ -470,91 +428,6 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
                 + "--------------------------------------\n";
     }
 
-    private void add1000Employees() {
-        if (!ConfirmDialog.ask(this, "Confirm Bulk Addition",
-                "Are you sure you want to generate and insert 1,000 employees into MySQL?")) {
-            return;
-        }
-
-        output.setText("Generating 1,000 employees...\n");
-        seed1000Btn.setEnabled(false);
-        statusLabel.setText("Inserting 1,000 employees into MySQL database in batch...");
-
-        new Thread(() -> {
-            try {
-                long start = System.currentTimeMillis();
-                List<Employee> batch = generate1000Employees();
-                employeeService.addBatch(batch);
-                long duration = System.currentTimeMillis() - start;
-                int totalCount = employeeService.count();
-
-                EventQueue.invokeLater(() -> {
-                    output.append("=========================================================\n");
-                    output.append("SUCCESS: Added 1,000 employees in " + duration + " ms!\n");
-                    output.append("500 Permanent Employees (with bonuses)\n");
-                    output.append("500 Contract Employees (with allowances & terms)\n");
-                    output.append("Total employees in MySQL database now: " + totalCount + "\n");
-                    output.append("=========================================================\n");
-                    output.append("Tip: Click 'Batch Run' to calculate payroll for all of them!\n");
-                    statusLabel.setText("1,000 employees inserted successfully in " + duration + " ms.");
-                    seed1000Btn.setEnabled(currentUser.getRole() == Role.ADMIN);
-                });
-            } catch (Exception ex) {
-                EventQueue.invokeLater(() -> {
-                    output.append("ERROR inserting 1,000 employees: " + ex.getMessage() + "\n");
-                    statusLabel.setText("Bulk insertion failed.");
-                    seed1000Btn.setEnabled(currentUser.getRole() == Role.ADMIN);
-                    AlertDialog.show(PayrollFrame.this, "Batch Insertion Error", ex.getMessage());
-                });
-            }
-        }, "bulk-employee-inserter").start();
-    }
-
-    private List<Employee> generate1000Employees() {
-        String[] firstNames = {
-            "Aarav", "Aditi", "Akhil", "Ananya", "Arjun", "Bhavya", "Chetan", "Deepa",
-            "Dev", "Divya", "Gautam", "Harish", "Ishaan", "Kavya", "Kiran", "Kushwanth",
-            "Manish", "Meena", "Mohan", "Neha", "Neeraj", "Nikhil", "Omkar", "Pooja",
-            "Pranav", "Rahul", "Rakesh", "Ravi", "Rohan", "Sandhya", "Sanjay", "Shreya",
-            "Sneha", "Suresh", "Surya", "Tarun", "Varun", "Vikas", "Vinay", "Yamini"
-        };
-        String[] lastNames = {
-            "Kumar", "Reddy", "Sharma", "Verma", "Patel", "Rao", "Nair", "Iyer",
-            "Singh", "Choudhury", "Gupta", "Mishra", "Joshi", "Das", "Bose", "Menon"
-        };
-
-        List<Employee> list = new ArrayList<>(1000);
-        Random rand = new Random();
-        String[] bankPrefixes = {"SBIN", "HDFC", "ICIC", "PUNB", "BARB", "UBIN"};
-
-        for (int i = 1; i <= 1000; i++) {
-            String fName = firstNames[rand.nextInt(firstNames.length)];
-            String lName = lastNames[rand.nextInt(lastNames.length)];
-            String fullName = fName + " " + lName + " #" + i;
-
-            // Salaries between 25,000 and 150,000 rounded to 500
-            double basicSalary = 25000 + (rand.nextInt(250) * 500);
-
-            Employee emp;
-            if (i % 2 == 1) {
-                // Permanent Employee
-                double bonus = 3000 + (rand.nextInt(35) * 500);
-                emp = new PermanentEmployee(0, fullName, basicSalary, bonus);
-            } else {
-                // Contract Employee
-                double contractAllowance = 2000 + (rand.nextInt(20) * 500);
-                int months = 6 + rand.nextInt(19); // 6 to 24 months
-                emp = new ContractEmployee(0, fullName, basicSalary, contractAllowance, months);
-            }
-
-            String prefix = bankPrefixes[rand.nextInt(bankPrefixes.length)];
-            String bankAccount = prefix + String.format("%010d", 1000000 + i);
-            emp.setBankAccount(bankAccount);
-            list.add(emp);
-        }
-        return list;
-    }
-
     // ========= Bank Salary Payment Simulation =========
 
     private void startPaymentSimulation() {
@@ -566,7 +439,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         try {
             List<Employee> all = employeeService.listAll();
             if (all.isEmpty()) {
-                output.setText("No employees found in database. Please add employees or click 'Add 1000 People' first.");
+                output.setText("No employees found in database. Please add employees first.");
                 return;
             }
 
@@ -669,7 +542,6 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
             sb.append("Stream Type:   Character Stream (BufferedWriter / FileWriter)\n");
             sb.append("Format:        CSV (ID, Name, Type, Basic, Bonus/Allowance, Months, Bank Account)\n");
             sb.append("=========================================================\n");
-            sb.append("Tip: Click 'Backup File' to create a byte-stream backup (FileInputStream/FileOutputStream).\n");
             output.setText(sb.toString());
             statusLabel.setText("Saved " + all.size() + " records to " + DATA_FILE);
         } catch (IOException ex) {
@@ -677,48 +549,6 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
             AlertDialog.show(this, "Save Error", "Failed to save file: " + ex.getMessage());
         } catch (DataAccessException ex) {
             output.setText("Database Error loading records: " + ex.getMessage());
-            AlertDialog.show(this, "Database Error", ex.getMessage());
-        }
-    }
-
-    private void loadRecordsFromFile() {
-        if (!ConfirmDialog.ask(this, "Load Records from File",
-                "Load employees from '" + DATA_FILE + "' and insert into database?")) {
-            return;
-        }
-
-        try {
-            List<Employee> loaded = fileService.loadEmployees(DATA_FILE);
-            if (loaded.isEmpty()) {
-                output.setText("File '" + DATA_FILE + "' is empty or contains no records.");
-                return;
-            }
-
-            long start = System.currentTimeMillis();
-            employeeService.addBatch(loaded);
-            long duration = System.currentTimeMillis() - start;
-            int totalCount = employeeService.count();
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("=========================================================\n");
-            sb.append("FILE I/O: PERSISTENT STORAGE (LOAD EMPLOYEES)\n");
-            sb.append("=========================================================\n");
-            sb.append("Successfully loaded and imported ").append(loaded.size()).append(" records from disk.\n");
-            sb.append("Source File:   ").append(DATA_FILE).append("\n");
-            sb.append("Stream Type:   Character Stream (BufferedReader / FileReader)\n");
-            sb.append("Import Time:   ").append(duration).append(" ms\n");
-            sb.append("Total In DB:   ").append(totalCount).append(" employees\n");
-            sb.append("=========================================================\n");
-            output.setText(sb.toString());
-            statusLabel.setText("Imported " + loaded.size() + " records from " + DATA_FILE);
-        } catch (FileNotFoundException ex) {
-            output.setText("File not found: " + DATA_FILE + "\nPlease click 'Save Records' first to create the data file.");
-            AlertDialog.show(this, "File Not Found", "Data file does not exist: " + DATA_FILE + "\nPlease save records first.");
-        } catch (IOException ex) {
-            output.setText("I/O Parsing Error: " + ex.getMessage());
-            AlertDialog.show(this, "Load Error", "Failed to parse records: " + ex.getMessage());
-        } catch (DataAccessException ex) {
-            output.setText("Database Error inserting records: " + ex.getMessage());
             AlertDialog.show(this, "Database Error", ex.getMessage());
         }
     }
@@ -754,36 +584,6 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         } catch (DataAccessException ex) {
             output.setText("Database Error: " + ex.getMessage());
             AlertDialog.show(this, "Database Error", ex.getMessage());
-        }
-    }
-
-    private void backupDataFile() {
-        try {
-            File srcFile = new File(DATA_FILE);
-            if (!srcFile.exists()) {
-                output.setText("Cannot create backup: Source file '" + DATA_FILE + "' does not exist.\nPlease click 'Save Records' first.");
-                AlertDialog.show(this, "Backup Failed", "Source file '" + DATA_FILE + "' does not exist.\nSave records first.");
-                return;
-            }
-
-            fileService.copyFile(DATA_FILE, BACKUP_FILE);
-            File destFile = new File(BACKUP_FILE);
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("=========================================================\n");
-            sb.append("FILE I/O: BYTE STREAM FILE BACKUP\n");
-            sb.append("=========================================================\n");
-            sb.append("Successfully copied data file byte-for-byte!\n");
-            sb.append("Source:        ").append(DATA_FILE).append(" (").append(srcFile.length()).append(" bytes)\n");
-            sb.append("Destination:   ").append(BACKUP_FILE).append(" (").append(destFile.length()).append(" bytes)\n");
-            sb.append("Stream Type:   Byte Streams (FileInputStream / FileOutputStream)\n");
-            sb.append("Exception Handling: Guaranteed stream closure in finally block\n");
-            sb.append("=========================================================\n");
-            output.setText(sb.toString());
-            statusLabel.setText("Backup created at " + BACKUP_FILE);
-        } catch (IOException ex) {
-            output.setText("I/O Error creating backup: " + ex.getMessage());
-            AlertDialog.show(this, "Backup Error", "Failed to backup file: " + ex.getMessage());
         }
     }
 
