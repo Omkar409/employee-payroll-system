@@ -16,6 +16,7 @@ public abstract class Employee implements java.io.Serializable {
     private double basicSalary;
     private final EmployeeType employeeType;
     private String bankAccount;
+    private String ifscCode;
     private Integer createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -59,6 +60,20 @@ public abstract class Employee implements java.io.Serializable {
         this.bankAccount = bankAccount;
         if (employeeId > 0 && bankAccount != null && !bankAccount.trim().isEmpty()) {
             BankAccountStore.setAccount(employeeId, bankAccount);
+        }
+    }
+
+    public String getIfscCode() {
+        if (ifscCode == null || ifscCode.trim().isEmpty()) {
+            return BankAccountStore.getIfsc(employeeId);
+        }
+        return ifscCode;
+    }
+
+    public void setIfscCode(String ifscCode) {
+        this.ifscCode = ifscCode;
+        if (employeeId > 0 && ifscCode != null && !ifscCode.trim().isEmpty()) {
+            BankAccountStore.setIfsc(employeeId, ifscCode);
         }
     }
 

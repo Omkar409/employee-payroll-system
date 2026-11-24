@@ -5,6 +5,7 @@ import payroll.dao.impl.UserDAOImpl;
 import payroll.service.AuthService;
 import payroll.ui.AlertDialog;
 import payroll.ui.LoginFrame;
+import payroll.ui.SplashScreenWindow;
 
 import java.awt.EventQueue;
 import java.util.logging.Level;
@@ -12,7 +13,8 @@ import java.util.logging.Logger;
 
 /**
  * Main application entry point for the Employee Payroll Management System.
- * Pre-checks database connectivity and launches LoginFrame on the AWT Event Dispatch Thread (EDT).
+ * Displays a 2.5-second modern startup splash screen with vector crest,
+ * tests MySQL connectivity, and launches the login window on the EDT.
  */
 public class Main {
 
@@ -21,16 +23,17 @@ public class Main {
     public static void main(String[] args) {
         LOGGER.info("Starting Employee Payroll Management System...");
 
-        boolean dbConnected = false;
-        try {
-            dbConnected = DatabaseConnection.getInstance().testConnection();
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Startup DB connection check failed: " + e.getMessage());
-        }
+        // Launch smooth 2.5-second splash screen with animated progress bar
+        SplashScreenWindow.showSplash(() -> {
+            boolean dbConnected = false;
+            try {
+                dbConnected = DatabaseConnection.getInstance().testConnection();
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Startup DB connection check failed: " + e.getMessage());
+            }
 
-        final boolean isDbAvailable = dbConnected;
+            final boolean isDbAvailable = dbConnected;
 
-        EventQueue.invokeLater(() -> {
             try {
                 UserDAOImpl userDAO = new UserDAOImpl();
                 AuthService authService = new AuthService(userDAO);

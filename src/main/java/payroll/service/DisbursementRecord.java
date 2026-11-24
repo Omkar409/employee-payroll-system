@@ -9,6 +9,7 @@ public record DisbursementRecord(
         int employeeId,
         String employeeName,
         String bankAccount,
+        String ifscCode,
         double grossAmount,
         double deductions,
         double netAmount,
@@ -18,7 +19,7 @@ public record DisbursementRecord(
 ) {
     @Override
     public String toString() {
-        return String.format("[%s] Emp #%d (%s) -> A/C %s | Net: Rs. %,.2f | UTR: %s",
-                status, employeeId, employeeName, bankAccount, netAmount, utr);
+        return String.format("[%s] Emp #%d (%s) -> A/C %s (IFSC: %s) | Net: Rs. %,.2f | UTR: %s",
+                status, employeeId, employeeName, bankAccount, ifscCode, netAmount, utr);
     }
 }

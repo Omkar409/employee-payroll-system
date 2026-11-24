@@ -15,7 +15,7 @@ import java.util.List;
  */
 public class PayrollFileService {
 
-    private static final String CSV_HEADER = "ID,NAME,TYPE,BASIC_SALARY,BONUS_OR_ALLOWANCE,CONTRACT_MONTHS,BANK_ACCOUNT";
+    private static final String CSV_HEADER = "ID,NAME,TYPE,BASIC_SALARY,BONUS_OR_ALLOWANCE,CONTRACT_MONTHS,BANK_ACCOUNT,IFSC_CODE";
 
     /**
      * Saves all employee records to a structured CSV / text file.
@@ -35,15 +35,18 @@ public class PayrollFileService {
             for (Employee emp : employees) {
                 String line;
                 if (emp instanceof PermanentEmployee pe) {
-                    line = String.format("%d,%s,PERMANENT,%.2f,%.2f,0,%s",
-                            pe.getEmployeeId(), pe.getName(), pe.getBasicSalary(), pe.getBonus(), pe.getBankAccount());
+                    line = String.format("%d,%s,PERMANENT,%.2f,%.2f,0,%s,%s",
+                            pe.getEmployeeId(), pe.getName(), pe.getBasicSalary(), pe.getBonus(),
+                            pe.getBankAccount(), pe.getIfscCode());
                 } else if (emp instanceof ContractEmployee ce) {
-                    line = String.format("%d,%s,CONTRACT,%.2f,%.2f,%d,%s",
+                    line = String.format("%d,%s,CONTRACT,%.2f,%.2f,%d,%s,%s",
                             ce.getEmployeeId(), ce.getName(), ce.getBasicSalary(),
-                            ce.getContractAllowance(), ce.getContractMonths(), ce.getBankAccount());
+                            ce.getContractAllowance(), ce.getContractMonths(),
+                            ce.getBankAccount(), ce.getIfscCode());
                 } else {
-                    line = String.format("%d,%s,%s,%.2f,0.00,0,%s",
-                            emp.getEmployeeId(), emp.getName(), emp.getEmployeeType().name(), emp.getBasicSalary(), emp.getBankAccount());
+                    line = String.format("%d,%s,%s,%.2f,0.00,0,%s,%s",
+                            emp.getEmployeeId(), emp.getName(), emp.getEmployeeType().name(), emp.getBasicSalary(),
+                            emp.getBankAccount(), emp.getIfscCode());
                 }
                 writer.write(line);
                 writer.newLine();
@@ -99,6 +102,9 @@ public class PayrollFileService {
                     if (parts.length > 6 && !parts[6].trim().isEmpty()) {
                         emp.setBankAccount(parts[6].trim());
                     }
+                    if (parts.length > 7 && !parts[7].trim().isEmpty()) {
+                        emp.setIfscCode(parts[7].trim());
+                    }
 
                     list.add(emp);
                 } catch (NumberFormatException nfe) {
@@ -125,6 +131,7 @@ public class PayrollFileService {
         sb.append(String.format("Employee Type:    %s\n", employee.getEmployeeType().name()));
         sb.append(String.format("Basic Salary:     Rs. %,10.2f\n", employee.getBasicSalary()));
         sb.append(String.format("Bank Account:     %s\n", employee.getBankAccount()));
+        sb.append(String.format("IFSC Code:        %s\n", employee.getIfscCode()));
         sb.append(String.format("Gross Salary:     Rs. %,10.2f\n", result.getGrossSalary()));
         sb.append(String.format("Deductions:       Rs. %,10.2f\n", result.getDeductions()));
         sb.append(String.format("Net Salary:       Rs. %,10.2f\n", result.getNetSalary()));
@@ -144,12 +151,12 @@ public class PayrollFileService {
      */
     public String formatSummary(List<Employee> employees, PayrollCalculator calculator) {
         StringBuilder sb = new StringBuilder();
-        sb.append("==========================================================================================================\n");
-        sb.append("                                        BATCH PAYROLL SUMMARY REPORT                              \n");
-        sb.append("==========================================================================================================\n");
-        sb.append(String.format("%-6s | %-20s | %-10s | %-16s | %12s | %12s | %12s | %12s\n",
-                "ID", "NAME", "CATEGORY", "BANK A/C", "BASIC", "GROSS", "DEDUCTIONS", "NET"));
-        sb.append("----------------------------------------------------------------------------------------------------------\n");
+        sb.append("=======================================================================================================================\n");
+        sb.append("                                                BATCH PAYROLL SUMMARY REPORT                                           \n");
+        sb.append("=======================================================================================================================\n");
+        sb.append(String.format("%-6s | %-20s | %-10s | %-16s | %-11s | %12s | %12s | %12s | %12s\n",
+                "ID", "NAME", "CATEGORY", "BANK A/C", "IFSC", "BASIC", "GROSS", "DEDUCTIONS", "NET"));
+        sb.append("-----------------------------------------------------------------------------------------------------------------------\n");
 
         double totalBasic = 0;
         double totalGross = 0;
@@ -158,11 +165,12 @@ public class PayrollFileService {
 
         for (Employee emp : employees) {
             PayrollResult r = calculator.calculate(emp);
-            sb.append(String.format("%-6d | %-20s | %-10s | %-16s | %12.2f | %12.2f | %12.2f | %12.2f\n",
+            sb.append(String.format("%-6d | %-20s | %-10s | %-16s | %-11s | %12.2f | %12.2f | %12.2f | %12.2f\n",
                     emp.getEmployeeId(),
                     emp.getName().length() > 20 ? emp.getName().substring(0, 17) + "..." : emp.getName(),
                     emp.getEmployeeType().name(),
                     emp.getBankAccount(),
+                    emp.getIfscCode(),
                     emp.getBasicSalary(), r.getGrossSalary(), r.getDeductions(), r.getNetSalary()));
 
             totalBasic += emp.getBasicSalary();
@@ -171,7 +179,7 @@ public class PayrollFileService {
             totalNet += r.getNetSalary();
         }
 
-        sb.append("==========================================================================================================\n");
+        sb.append("=======================================================================================================================\n");
         sb.append(String.format("TOTAL EMPLOYEES: %d\n", employees.size()));
         sb.append(String.format("TOTAL BASIC SALARY:      Rs. %,14.2f\n", totalBasic));
         sb.append(String.format("TOTAL GROSS PAYOUT:      Rs. %,14.2f\n", totalGross));

@@ -79,11 +79,13 @@ public class PaymentSimulationService {
 
             String utr = generateUtr(emp.getEmployeeId());
             String bankAccount = emp.getBankAccount();
+            String ifsc = emp.getIfscCode();
 
             DisbursementRecord record = new DisbursementRecord(
                     emp.getEmployeeId(),
                     emp.getName(),
                     bankAccount,
+                    ifsc,
                     gross,
                     deductions,
                     net,

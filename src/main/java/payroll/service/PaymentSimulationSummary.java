@@ -45,18 +45,19 @@ public record PaymentSimulationSummary(
         sb.append(String.format("  Execution Time:      %d ms\n", durationMillis));
         sb.append(String.format("  Settlement Date:     %s\n\n", LocalDateTime.now().format(dtf)));
 
-        sb.append("----------------------------------------------------------------------------------------\n");
-        sb.append(String.format("%-5s | %-20s | %-16s | %12s | %-20s | %-7s\n",
-                "ID", "EMPLOYEE NAME", "BANK ACCOUNT", "NET PAYOUT", "TRANSACTION UTR", "STATUS"));
-        sb.append("----------------------------------------------------------------------------------------\n");
+        sb.append("-------------------------------------------------------------------------------------------------------\n");
+        sb.append(String.format("%-5s | %-20s | %-16s | %-11s | %12s | %-20s | %-7s\n",
+                "ID", "EMPLOYEE NAME", "BANK ACCOUNT", "IFSC", "NET PAYOUT", "TRANSACTION UTR", "STATUS"));
+        sb.append("-------------------------------------------------------------------------------------------------------\n");
 
         int limit = Math.min(disbursements.size(), 30);
         for (int i = 0; i < limit; i++) {
             DisbursementRecord d = disbursements.get(i);
-            sb.append(String.format("%-5d | %-20s | %-16s | Rs. %,9.2f | %-20s | %-7s\n",
+            sb.append(String.format("%-5d | %-20s | %-16s | %-11s | Rs. %,9.2f | %-20s | %-7s\n",
                     d.employeeId(),
                     d.employeeName().length() > 20 ? d.employeeName().substring(0, 17) + "..." : d.employeeName(),
                     d.bankAccount(),
+                    d.ifscCode(),
                     d.netAmount(),
                     d.utr(),
                     d.status()));
@@ -67,7 +68,7 @@ public record PaymentSimulationSummary(
                     disbursements.size() - limit));
         }
 
-        sb.append("----------------------------------------------------------------------------------------\n");
+        sb.append("-------------------------------------------------------------------------------------------------------\n");
         sb.append(String.format("TOTAL GROSS ACCRUED:      Rs. %,14.2f\n", totalGross));
         sb.append(String.format("TOTAL TAXES / DEDUCTIONS: Rs. %,14.2f\n", totalDeductions));
         sb.append(String.format("TOTAL NET DISBURSED:      Rs. %,14.2f\n", totalDisbursed));
