@@ -7,6 +7,7 @@ import java.util.Optional;
 public interface EmployeeDAO {
     int insert(Employee employee, int createdByUserId) throws DataAccessException;
     void insertBatch(List<Employee> employees, int createdByUserId) throws DataAccessException;
+    int deleteGeneratedBatch() throws DataAccessException;
     Optional<Employee> findById(int employeeId) throws DataAccessException;
     List<Employee> findAll() throws DataAccessException;
     List<Employee> findPage(int offset, int limit) throws DataAccessException;

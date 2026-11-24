@@ -43,6 +43,16 @@ public class InMemoryEmployeeDAO implements EmployeeDAO {
     }
 
     @Override
+    public int deleteGeneratedBatch() throws DataAccessException {
+        List<Integer> ids = storage.values().stream()
+                .filter(e -> e.getName().contains("#"))
+                .map(Employee::getEmployeeId)
+                .toList();
+        ids.forEach(storage::remove);
+        return ids.size();
+    }
+
+    @Override
     public Optional<Employee> findById(int employeeId) throws DataAccessException {
         return Optional.ofNullable(storage.get(employeeId));
     }

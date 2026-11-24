@@ -77,6 +77,18 @@ public class EmployeeDAOImpl implements EmployeeDAO {
     }
 
     @Override
+    public int deleteGeneratedBatch() throws DataAccessException {
+        String sql = "DELETE FROM employees WHERE name LIKE '%#%'";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             Statement stmt = conn.createStatement()) {
+            return stmt.executeUpdate(sql);
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "SQL error deleting bulk employees", e);
+            throw new DataAccessException("Failed to delete bulk employees: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public Optional<Employee> findById(int employeeId) throws DataAccessException {
         String sql = "SELECT employee_id, name, basic_salary, employee_type, bonus, contract_allowance, contract_months, created_by, created_at, updated_at FROM employees WHERE employee_id = ?";
         try (Connection conn = DatabaseConnection.getInstance().getConnection();

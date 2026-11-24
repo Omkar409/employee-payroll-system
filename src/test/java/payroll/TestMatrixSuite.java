@@ -13,6 +13,7 @@ import payroll.service.exception.ValidationException;
 import payroll.util.InputValidator;
 import payroll.util.PasswordHasher;
 
+import java.io.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -48,6 +49,7 @@ public class TestMatrixSuite {
         testPasswordHasher();
         testInputValidation();
         testInMemoryDAO();
+        testFileIOAndPersistence();
 
         if (dbOk) {
             testSqlInjectionResilience();
@@ -165,6 +167,86 @@ public class TestMatrixSuite {
             assertTrue("INMEM4", "InMemoryEmployeeDAO deletes employee", deleted);
         } catch (DataAccessException e) {
             assertTrue("INMEM-ERR", "Unexpected exception: " + e.getMessage(), false);
+        }
+    }
+
+    private static void testFileIOAndPersistence() {
+        System.out.println(">>> Section: File I/O & Character/Byte Streams (Report Syllabus)");
+        PayrollFileService fileService = new PayrollFileService();
+        String testDataFile = "data/test_employees.txt";
+        String testBackupFile = "data/test_employees_backup.txt";
+        String testReportFile = "data/test_payroll_report.txt";
+
+        try {
+            // 1. Save and Load roundtrip (Character Streams)
+            PermanentEmployee pe = new PermanentEmployee(101, "Alice Walker", 60000.0, 5000.0);
+            ContractEmployee ce = new ContractEmployee(102, "Bob Miller", 45000.0, 3000.0, 12);
+            List<Employee> originalList = List.of(pe, ce);
+
+            fileService.saveEmployees(originalList, testDataFile);
+            File f = new File(testDataFile);
+            assertTrue("FILE1a", "saveEmployees creates data file on disk", f.exists() && f.length() > 0);
+
+            List<Employee> loadedList = fileService.loadEmployees(testDataFile);
+            assertTrue("FILE1b", "loadEmployees reads all records back", loadedList.size() == 2);
+            assertTrue("FILE1c", "loadEmployees preserves PermanentEmployee fields",
+                    loadedList.get(0) instanceof PermanentEmployee loadedPe &&
+                    loadedPe.getEmployeeId() == 101 &&
+                    loadedPe.getName().equals("Alice Walker") &&
+                    loadedPe.getBonus() == 5000.0);
+            assertTrue("FILE1d", "loadEmployees preserves ContractEmployee fields",
+                    loadedList.get(1) instanceof ContractEmployee loadedCe &&
+                    loadedCe.getEmployeeId() == 102 &&
+                    loadedCe.getName().equals("Bob Miller") &&
+                    loadedCe.getContractAllowance() == 3000.0 &&
+                    loadedCe.getContractMonths() == 12);
+
+            // 2. Method Overloading Verification
+            StandardPayrollCalculator calc = new StandardPayrollCalculator();
+            PayrollResult r = calc.calculate(pe);
+
+            String summary1 = fileService.formatSummary(pe, r);
+            assertTrue("FILE2a", "formatSummary(emp, res) generates single payslip summary",
+                    summary1.contains("Alice Walker") && summary1.contains("EMPLOYEE PAYROLL SUMMARY"));
+
+            String summary2 = fileService.formatSummary(pe, r, "*** SRM HR CONFIDENTIAL ***");
+            assertTrue("FILE2b", "formatSummary(emp, res, header) includes custom banner overload",
+                    summary2.startsWith("*** SRM HR CONFIDENTIAL ***") && summary2.contains("Alice Walker"));
+
+            String summary3 = fileService.formatSummary(originalList, calc);
+            assertTrue("FILE2c", "formatSummary(list, calc) generates batch summary table with totals",
+                    summary3.contains("BATCH PAYROLL SUMMARY REPORT") &&
+                    summary3.contains("TOTAL EMPLOYEES: 2") &&
+                    summary3.contains("TOTAL BASIC SALARY"));
+
+            // 3. Generate Report to disk
+            fileService.generateReport(originalList, calc, testReportFile);
+            File repFile = new File(testReportFile);
+            assertTrue("FILE3", "generateReport writes batch summary to file",
+                    repFile.exists() && repFile.length() > 0);
+
+            // 4. Byte Stream Copy (FileInputStream / FileOutputStream with finally block)
+            fileService.copyFile(testDataFile, testBackupFile);
+            File bkpFile = new File(testBackupFile);
+            assertTrue("FILE4", "copyFile copies file byte-for-byte using byte streams",
+                    bkpFile.exists() && bkpFile.length() == f.length());
+
+            // 5. FileNotFoundException handling
+            boolean fnfCaught = false;
+            try {
+                fileService.loadEmployees("data/non_existent_file_99999.txt");
+            } catch (FileNotFoundException fnfe) {
+                fnfCaught = true;
+            }
+            assertTrue("FILE5", "loadEmployees on non-existent path throws FileNotFoundException", fnfCaught);
+
+        } catch (Exception e) {
+            assertTrue("FILE-ERR", "Unexpected exception during File I/O tests: " + e.getMessage(), false);
+        } finally {
+            // Clean up test files
+            new File(testDataFile).delete();
+            new File(testBackupFile).delete();
+            new File(testReportFile).delete();
         }
     }
 

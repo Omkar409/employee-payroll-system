@@ -7,20 +7,28 @@ import payroll.service.exception.ValidationException;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 /**
  * Main application dashboard (pure Java AWT).
- * Features: Add/Edit/Delete/Search employees, Calculate payroll, Run batch, Export report.
+ * Features: Add/Edit/Delete/Search employees, Calculate payroll, Run batch, File I/O operations.
  * Respects Role-based Access Control: ADMIN vs HR.
  */
 public class PayrollFrame extends Frame implements ActionListener, ItemListener {
 
+    private static final String DATA_FILE = "data/employees.txt";
+    private static final String BACKUP_FILE = "data/employees_backup.txt";
+    private static final String REPORT_FILE = "data/payroll_report.txt";
+
     private final User currentUser;
     private final EmployeeService employeeService;
     private final PayrollBatchService batchService;
+    private final PayrollFileService fileService = new PayrollFileService();
 
     // Form fields
     private final TextField idField      = new TextField(12);
@@ -34,15 +42,19 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
     private final TextArea output = new TextArea(14, 70);
 
     // Buttons
-    private final Button addBtn      = new Button("Add");
-    private final Button calcBtn     = new Button("Calculate");
-    private final Button searchBtn   = new Button("Search ID");
-    private final Button deleteBtn   = new Button("Delete");
-    private final Button viewAllBtn  = new Button("View All");
-    private final Button batchBtn    = new Button("Batch Run");
-    private final Button seed1000Btn = new Button("Add 1000 People");
-    private final Button cancelBtn   = new Button("Cancel Batch");
-    private final Button clearBtn    = new Button("Clear");
+    private final Button addBtn        = new Button("Add");
+    private final Button calcBtn       = new Button("Calculate");
+    private final Button searchBtn     = new Button("Search ID");
+    private final Button deleteBtn     = new Button("Delete");
+    private final Button viewAllBtn    = new Button("View All");
+    private final Button batchBtn      = new Button("Batch Run");
+    private final Button seed1000Btn   = new Button("Add 1000 People");
+    private final Button cancelBtn     = new Button("Cancel Batch");
+    private final Button clearBtn      = new Button("Clear");
+    private final Button saveFileBtn   = new Button("Save Records");
+    private final Button loadFileBtn   = new Button("Load Records");
+    private final Button exportRepBtn  = new Button("Export Report");
+    private final Button backupFileBtn = new Button("Backup File");
 
     private Label statusLabel;
 
@@ -56,14 +68,15 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         buildUI();
         applyRoleRestrictions();
 
-        setSize(820, 600);
+        setSize(860, 640);
         setLocationRelativeTo(null);
         setVisible(false);
 
         output.setText("Welcome, " + currentUser.getFullName() + "!\n"
                 + "Role: " + currentUser.getRole().name() + "\n"
                 + "=========================================================\n"
-                + "Use the form above to manage employees and run payroll.\n");
+                + "Use the form above to manage employees and run payroll.\n"
+                + "File I/O buttons below allow saving, loading, report export, and backup.\n");
     }
 
     private void buildUI() {
@@ -88,19 +101,25 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         form.add(extraLabel);               form.add(extraField);
         extraField.setEnabled(false);
 
-        // --- Buttons row 1 ---
+        // --- Buttons row 1: CRUD & Lookup ---
         Panel row1 = new Panel(new FlowLayout(FlowLayout.CENTER, 6, 4));
         for (Button b : new Button[]{addBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn})
             row1.add(b);
 
-        // --- Buttons row 2 ---
+        // --- Buttons row 2: Batch & Maintenance ---
         Panel row2 = new Panel(new FlowLayout(FlowLayout.CENTER, 6, 4));
         for (Button b : new Button[]{batchBtn, seed1000Btn, cancelBtn, clearBtn})
             row2.add(b);
 
-        Panel btnContainer = new Panel(new GridLayout(2, 1, 4, 4));
+        // --- Buttons row 3: File I/O & Reports ---
+        Panel row3 = new Panel(new FlowLayout(FlowLayout.CENTER, 6, 4));
+        for (Button b : new Button[]{saveFileBtn, loadFileBtn, exportRepBtn, backupFileBtn})
+            row3.add(b);
+
+        Panel btnContainer = new Panel(new GridLayout(3, 1, 4, 4));
         btnContainer.add(row1);
         btnContainer.add(row2);
+        btnContainer.add(row3);
 
         // --- Status bar ---
         statusLabel = new Label(" ", Label.LEFT);
@@ -135,7 +154,9 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         add(south,      BorderLayout.SOUTH);
 
         // Action listeners
-        for (Button b : new Button[]{addBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn, batchBtn, seed1000Btn, cancelBtn, clearBtn})
+        for (Button b : new Button[]{addBtn, calcBtn, searchBtn, deleteBtn, viewAllBtn,
+                                     batchBtn, seed1000Btn, cancelBtn, clearBtn,
+                                     saveFileBtn, loadFileBtn, exportRepBtn, backupFileBtn})
             b.addActionListener(this);
 
         addWindowListener(new WindowAdapter() {
@@ -153,6 +174,7 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
         deleteBtn.setEnabled(isAdmin);
         batchBtn.setEnabled(isAdmin);
         seed1000Btn.setEnabled(isAdmin);
+        loadFileBtn.setEnabled(isAdmin);
     }
 
     @Override
@@ -172,15 +194,19 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
     @Override
     public void actionPerformed(ActionEvent e) {
         Object src = e.getSource();
-        if (src == addBtn)          addEmployee();
-        else if (src == calcBtn)     calculatePayroll();
-        else if (src == searchBtn)   searchEmployee();
-        else if (src == deleteBtn)   deleteEmployee();
-        else if (src == viewAllBtn)  viewAll();
-        else if (src == batchBtn)    startBatch();
-        else if (src == seed1000Btn) add1000Employees();
-        else if (src == cancelBtn)   batchService.cancel();
-        else if (src == clearBtn)    output.setText("");
+        if (src == addBtn)             addEmployee();
+        else if (src == calcBtn)        calculatePayroll();
+        else if (src == searchBtn)      searchEmployee();
+        else if (src == deleteBtn)      deleteEmployee();
+        else if (src == viewAllBtn)     viewAll();
+        else if (src == batchBtn)       startBatch();
+        else if (src == seed1000Btn)    add1000Employees();
+        else if (src == cancelBtn)      batchService.cancel();
+        else if (src == clearBtn)       output.setText("");
+        else if (src == saveFileBtn)    saveRecordsToFile();
+        else if (src == loadFileBtn)    loadRecordsFromFile();
+        else if (src == exportRepBtn)   exportReportToFile();
+        else if (src == backupFileBtn)  backupDataFile();
     }
 
     // ========= Operations =========
@@ -440,6 +466,145 @@ public class PayrollFrame extends Frame implements ActionListener, ItemListener 
             }
         }
         return list;
+    }
+
+    // ========= File I/O Operations =========
+
+    private void saveRecordsToFile() {
+        try {
+            List<Employee> all = employeeService.listAll();
+            if (all.isEmpty()) {
+                output.setText("No employee records in database to save.");
+                return;
+            }
+            fileService.saveEmployees(all, DATA_FILE);
+            File f = new File(DATA_FILE);
+            StringBuilder sb = new StringBuilder();
+            sb.append("=========================================================\n");
+            sb.append("FILE I/O: PERSISTENT STORAGE (SAVE EMPLOYEES)\n");
+            sb.append("=========================================================\n");
+            sb.append("Successfully saved ").append(all.size()).append(" employee records to disk.\n");
+            sb.append("File Path:     ").append(f.getPath()).append(" (").append(f.getAbsolutePath()).append(")\n");
+            sb.append("File Size:     ").append(f.length()).append(" bytes\n");
+            sb.append("Stream Type:   Character Stream (BufferedWriter / FileWriter)\n");
+            sb.append("Format:        CSV (ID, Name, Type, Basic, Bonus/Allowance, Months)\n");
+            sb.append("=========================================================\n");
+            sb.append("Tip: Click 'Backup File' to create a byte-stream backup (FileInputStream/FileOutputStream).\n");
+            output.setText(sb.toString());
+            statusLabel.setText("Saved " + all.size() + " records to " + DATA_FILE);
+        } catch (IOException ex) {
+            output.setText("I/O Error saving records: " + ex.getMessage());
+            AlertDialog.show(this, "Save Error", "Failed to save file: " + ex.getMessage());
+        } catch (DataAccessException ex) {
+            output.setText("Database Error loading records: " + ex.getMessage());
+            AlertDialog.show(this, "Database Error", ex.getMessage());
+        }
+    }
+
+    private void loadRecordsFromFile() {
+        if (!ConfirmDialog.ask(this, "Load Records from File",
+                "Load employees from '" + DATA_FILE + "' and insert into database?")) {
+            return;
+        }
+
+        try {
+            List<Employee> loaded = fileService.loadEmployees(DATA_FILE);
+            if (loaded.isEmpty()) {
+                output.setText("File '" + DATA_FILE + "' is empty or contains no records.");
+                return;
+            }
+
+            long start = System.currentTimeMillis();
+            employeeService.addBatch(loaded);
+            long duration = System.currentTimeMillis() - start;
+            int totalCount = employeeService.count();
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("=========================================================\n");
+            sb.append("FILE I/O: PERSISTENT STORAGE (LOAD EMPLOYEES)\n");
+            sb.append("=========================================================\n");
+            sb.append("Successfully loaded and imported ").append(loaded.size()).append(" records from disk.\n");
+            sb.append("Source File:   ").append(DATA_FILE).append("\n");
+            sb.append("Stream Type:   Character Stream (BufferedReader / FileReader)\n");
+            sb.append("Import Time:   ").append(duration).append(" ms\n");
+            sb.append("Total In DB:   ").append(totalCount).append(" employees\n");
+            sb.append("=========================================================\n");
+            output.setText(sb.toString());
+            statusLabel.setText("Imported " + loaded.size() + " records from " + DATA_FILE);
+        } catch (FileNotFoundException ex) {
+            output.setText("File not found: " + DATA_FILE + "\nPlease click 'Save Records' first to create the data file.");
+            AlertDialog.show(this, "File Not Found", "Data file does not exist: " + DATA_FILE + "\nPlease save records first.");
+        } catch (IOException ex) {
+            output.setText("I/O Parsing Error: " + ex.getMessage());
+            AlertDialog.show(this, "Load Error", "Failed to parse records: " + ex.getMessage());
+        } catch (DataAccessException ex) {
+            output.setText("Database Error inserting records: " + ex.getMessage());
+            AlertDialog.show(this, "Database Error", ex.getMessage());
+        }
+    }
+
+    private void exportReportToFile() {
+        try {
+            List<Employee> all = employeeService.listAll();
+            if (all.isEmpty()) {
+                output.setText("No employee records found in database to export.");
+                return;
+            }
+
+            PayrollCalculator calc = new StandardPayrollCalculator();
+            fileService.generateReport(all, calc, REPORT_FILE);
+            File f = new File(REPORT_FILE);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("=========================================================\n");
+            sb.append("FILE I/O: PAYROLL REPORT EXPORTED\n");
+            sb.append("=========================================================\n");
+            sb.append("Successfully generated and exported batch report to disk.\n");
+            sb.append("File Path:     ").append(f.getPath()).append(" (").append(f.getAbsolutePath()).append(")\n");
+            sb.append("File Size:     ").append(f.length()).append(" bytes\n");
+            sb.append("Features Used: Method Overloading + Character Streams\n");
+            sb.append("=========================================================\n\n");
+            sb.append(fileService.formatSummary(all, calc));
+
+            output.setText(sb.toString());
+            statusLabel.setText("Report exported to " + REPORT_FILE);
+        } catch (IOException ex) {
+            output.setText("I/O Error exporting report: " + ex.getMessage());
+            AlertDialog.show(this, "Export Error", "Failed to export report: " + ex.getMessage());
+        } catch (DataAccessException ex) {
+            output.setText("Database Error: " + ex.getMessage());
+            AlertDialog.show(this, "Database Error", ex.getMessage());
+        }
+    }
+
+    private void backupDataFile() {
+        try {
+            File srcFile = new File(DATA_FILE);
+            if (!srcFile.exists()) {
+                output.setText("Cannot create backup: Source file '" + DATA_FILE + "' does not exist.\nPlease click 'Save Records' first.");
+                AlertDialog.show(this, "Backup Failed", "Source file '" + DATA_FILE + "' does not exist.\nSave records first.");
+                return;
+            }
+
+            fileService.copyFile(DATA_FILE, BACKUP_FILE);
+            File destFile = new File(BACKUP_FILE);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("=========================================================\n");
+            sb.append("FILE I/O: BYTE STREAM FILE BACKUP\n");
+            sb.append("=========================================================\n");
+            sb.append("Successfully copied data file byte-for-byte!\n");
+            sb.append("Source:        ").append(DATA_FILE).append(" (").append(srcFile.length()).append(" bytes)\n");
+            sb.append("Destination:   ").append(BACKUP_FILE).append(" (").append(destFile.length()).append(" bytes)\n");
+            sb.append("Stream Type:   Byte Streams (FileInputStream / FileOutputStream)\n");
+            sb.append("Exception Handling: Guaranteed stream closure in finally block\n");
+            sb.append("=========================================================\n");
+            output.setText(sb.toString());
+            statusLabel.setText("Backup created at " + BACKUP_FILE);
+        } catch (IOException ex) {
+            output.setText("I/O Error creating backup: " + ex.getMessage());
+            AlertDialog.show(this, "Backup Error", "Failed to backup file: " + ex.getMessage());
+        }
     }
 
     private void clearForm() {
